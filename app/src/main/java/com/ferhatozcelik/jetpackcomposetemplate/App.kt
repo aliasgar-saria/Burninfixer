@@ -13,6 +13,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue      
+import androidx.compose.runtime.setValue      
+import androidx.compose.runtime.mutableStateOf 
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -52,9 +55,9 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun BurnInApp() {
+    // FIX: Using classic mutableStateOf for broad compatibility
     var currentMode by remember { mutableStateOf(AppMode.MENU) }
 
-    // Simple State-Based Navigation
     when (currentMode) {
         AppMode.MENU -> MainMenuScreen(
             onNavigateChecker = { currentMode = AppMode.CHECKER },
@@ -110,18 +113,18 @@ fun MainMenuScreen(onNavigateChecker: () -> Unit, onNavigateFixer: () -> Unit) {
 @Composable
 fun CheckerScreen(onBack: () -> Unit) {
     val activity = LocalContext.current as Activity
-    MaximizeDisplayCapabilities(activity.window) // Force max brightness
-    BackHandler { onBack() } // Handle Android back button
+    MaximizeDisplayCapabilities(activity.window) 
+    BackHandler { onBack() } 
 
     val testColors = listOf(Color.DarkGray, Color.LightGray, Color.Red, Color.Green, Color.Blue, Color.White)
-    var colorIndex by remember { mutableIntStateOf(0) }
+    // FIX: Changed to mutableStateOf
+    var colorIndex by remember { mutableStateOf(0) }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(testColors[colorIndex])
             .clickable { 
-                // Cycle colors on tap, go back to menu when done
                 if (colorIndex < testColors.size - 1) colorIndex++ else onBack() 
             },
         contentAlignment = Alignment.Center
@@ -147,14 +150,17 @@ fun FixerScreen(onBack: () -> Unit) {
     BackHandler { onBack() }
 
     val colors = listOf(Color.Red, Color.Green, Color.Blue, Color.White)
-    var speedMs by remember { mutableLongStateOf(100L) }
-    var redrawTrigger by remember { mutableIntStateOf(0) } 
-    var timeRemainingSeconds by remember { mutableIntStateOf(300) } // Default 5 mins
+    
+    // FIX: Explicitly using generic Ints and classic State 
+    var speedMs by remember { mutableStateOf(100) }
+    var redrawTrigger by remember { mutableStateOf(0) } 
+    var timeRemainingSeconds by remember { mutableStateOf(300) } 
 
     // Matrix Render Loop
     LaunchedEffect(speedMs) {
         while (true) {
-            delay(speedMs)
+            // FIX: explicitly converting to Long here resolves the ambiguity error
+            delay(speedMs.toLong())
             redrawTrigger++
         }
     }
@@ -162,17 +168,15 @@ fun FixerScreen(onBack: () -> Unit) {
     // Auto-Shutdown Timer Loop
     LaunchedEffect(Unit) {
         while (timeRemainingSeconds > 0) {
-            delay(1000)
+            delay(1000L)
             timeRemainingSeconds--
         }
-        onBack() // Auto-exit when timer hits 0
+        onBack() 
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Top 15% Matrix Flasher (Expanded slightly for modern phone notches/status bars)
         MatrixCanvas(modifier = Modifier.fillMaxWidth().weight(0.15f), colors = colors, trigger = redrawTrigger)
         
-        // Middle 70% UI & Black Space
         Box(
             modifier = Modifier.fillMaxWidth().weight(0.70f).background(Color.Black),
             contentAlignment = Alignment.Center
@@ -190,8 +194,8 @@ fun FixerScreen(onBack: () -> Unit) {
                 
                 Text("Flash Interval: ${speedMs}ms", color = Color.LightGray)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-                    Button(onClick = { speedMs = 100L }) { Text("Safe") }
-                    Button(onClick = { speedMs = 30L }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF57C00))) { Text("Aggressive") }
+                    Button(onClick = { speedMs = 100 }) { Text("Safe") }
+                    Button(onClick = { speedMs = 30 }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF57C00))) { Text("Aggressive") }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -220,7 +224,6 @@ fun FixerScreen(onBack: () -> Unit) {
             }
         }
         
-        // Bottom 15% Matrix Flasher
         MatrixCanvas(modifier = Modifier.fillMaxWidth().weight(0.15f), colors = colors, trigger = redrawTrigger)
     }
 }
@@ -231,15 +234,13 @@ fun FixerScreen(onBack: () -> Unit) {
 @Composable
 fun MatrixCanvas(modifier: Modifier, colors: List<Color>, trigger: Int) {
     Canvas(modifier = modifier) {
-        trigger.hashCode() // Force recomposition on trigger change
+        trigger.hashCode() 
         
         val cols = 40 
         val rows = 12  
         val cellWidth = size.width / cols
         val cellHeight = size.height / rows
 
-        // Math happens directly inside the draw loop to avoid creating thousands 
-        // of temporary objects, saving garbage collection and battery life.
         for (x in 0 until cols) {
             for (y in 0 until rows) {
                 drawRect(
@@ -257,18 +258,15 @@ fun MatrixCanvas(modifier: Modifier, colors: List<Color>, trigger: Int) {
 // ==========================================
 @Composable
 fun MaximizeDisplayCapabilities(window: Window) {
-    // DisposableEffect runs when the screen opens, and onDispose runs when it closes
     DisposableEffect(Unit) {
         val originalBrightness = window.attributes.screenBrightness
         val layoutParams = window.attributes
         
-        // Force screen on and brightness to hardware maximum
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_FULL
         window.attributes = layoutParams
 
         onDispose {
-            // Restore the user's original settings perfectly when they leave the screen
             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             layoutParams.screenBrightness = originalBrightness
             window.attributes = layoutParams
